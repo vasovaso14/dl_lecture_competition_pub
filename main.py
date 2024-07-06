@@ -10,10 +10,44 @@ import torch
 import torch.nn as nn
 import torchvision
 from torchvision import transforms
+from transformers import CLIPProcessor, CLIPModel, BertTokenizer, BertModel
 
-import torch.autograd.profiler as profiler
+from torch.nn.utils.rnn import pad_sequence
 
-import shutil
+# Custom collate function
+def collate_fn(batch):
+    if len(batch[0]) == 4:
+        images, questions, answers, mode_answers = zip(*batch)
+        
+        # Pad questions tensors to have the same length
+        input_ids = pad_sequence([q['input_ids'].squeeze(0) for q in questions], batch_first=True)
+        attention_mask = pad_sequence([q['attention_mask'].squeeze(0) for q in questions], batch_first=True)
+        
+        images = torch.stack(images)
+        answers = torch.stack(answers)
+        mode_answers = torch.tensor(mode_answers)
+
+        question_encoding = {
+            'input_ids': input_ids,
+            'attention_mask': attention_mask
+        }
+        
+        return images, question_encoding, answers, mode_answers
+    else:
+        images, questions = zip(*batch)
+
+        # Pad questions tensors to have the same length
+        input_ids = pad_sequence([q['input_ids'].squeeze(0) for q in questions], batch_first=True)
+        attention_mask = pad_sequence([q['attention_mask'].squeeze(0) for q in questions], batch_first=True)
+        
+        images = torch.stack(images)
+
+        question_encoding = {
+            'input_ids': input_ids,
+            'attention_mask': attention_mask
+        }
+        
+        return images, question_encoding
 
 def set_seed(seed):
     random.seed(seed)
@@ -134,21 +168,19 @@ class VQADataset(torch.utils.data.Dataset):
         image = Image.open(f"{self.image_dir}/{self.df['image'][idx]}")
         image = self.transform(image)
         question = np.zeros(len(self.idx2question) + 1)  # 未知語用の要素を追加
-        question_words = self.df["question"][idx].split(" ")
-        for word in question_words:
-            try:
-                question[self.question2idx[word]] = 1  # one-hot表現に変換
-            except KeyError:
-                question[-1] = 1  # 未知語
+        question = self.df["question"][idx]
+        question = tokenizer(question, return_tensors="pt", padding=True, truncation=True, max_length=64)
 
         if self.answer:
             answers = [self.answer2idx[process_text(answer["answer"])] for answer in self.df["answers"][idx]]
             mode_answer_idx = mode(answers)  # 最頻値を取得（正解ラベル）
 
-            return image, torch.Tensor(question), torch.Tensor(answers), int(mode_answer_idx)
+            # return image, torch.Tensor(question), torch.Tensor(answers), int(mode_answer_idx)
+            return image, question, torch.Tensor(answers), int(mode_answer_idx)
 
         else:
-            return image, torch.Tensor(question)
+            # return image, torch.Tensor(question)
+            return image, question
 
     def __len__(self):
         return len(self.df)
@@ -294,7 +326,9 @@ class VQAModel(nn.Module):
     def __init__(self, vocab_size: int, n_answer: int):
         super().__init__()
         self.resnet = ResNet18()
-        self.text_encoder = nn.Linear(vocab_size, 512)
+        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        self.bert_model = BertModel.from_pretrained("bert-base-uncased")
+        self.text_encoder = nn.Linear(768, 512)
 
         self.fc = nn.Sequential(
             nn.Linear(1024, 512),
@@ -303,8 +337,9 @@ class VQAModel(nn.Module):
         )
 
     def forward(self, image, question):
-        image_feature = self.resnet(image)  # 画像の特徴量
-        question_feature = self.text_encoder(question)  # テキストの特徴量
+        image_feature = self.clip_model.get_image_features(image)
+        question_feature = self.bert_model(**question).pooler_output  # テキストの特徴量
+        question_feature = self.text_encoder(question_feature)  # テキストの特徴量
 
         x = torch.cat([image_feature, question_feature], dim=1)
         x = self.fc(x)
@@ -321,14 +356,10 @@ def train(model, dataloader, optimizer, criterion, device):
     simple_acc = 0
 
     start = time.time()
-    count = 0
-    #with profiler.profile(record_shapes=True) as prof:
     for image, question, answers, mode_answer in dataloader:
-        print(count)
-        count += 1
-        image, question, answer, mode_answer = \
-            image.to(device), question.to(device), answers.to(device), mode_answer.to(device)
-
+        question = {key: value.to(device) for key, value in question.items()} 
+        image, answer, mode_answer = \
+            image.to(device), answers.to(device), mode_answer.to(device)
         pred = model(image, question)
         loss = criterion(pred, mode_answer.squeeze())
 
@@ -339,8 +370,6 @@ def train(model, dataloader, optimizer, criterion, device):
         total_loss += loss.item()
         total_acc += VQA_criterion(pred.argmax(1), answers)  # VQA accuracy
         simple_acc += (pred.argmax(1) == mode_answer).float().mean().item()  # simple accuracy
-
-    #print(prof.key_averages().table(sort_by="cpu_time_total"))
 
     return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
 
@@ -370,7 +399,7 @@ def eval(model, dataloader, optimizer, criterion, device):
 def main():
     # deviceの設定
     set_seed(42)
-    device = "cuda:1" if torch.cuda.is_available() else "cpu"
+    device = "cuda:2" if torch.cuda.is_available() else "cpu"
 
     # dataloader / model
     transform = transforms.Compose([
@@ -383,13 +412,13 @@ def main():
 
     print("device: {}".format(device))
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=2, pin_memory=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=2, pin_memory=True, collate_fn=collate_fn)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True, collate_fn=collate_fn)
 
     model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
 
     # optimizer / criterion
-    num_epoch = 1
+    num_epoch = 10
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
@@ -406,7 +435,8 @@ def main():
     model.eval()
     submission = []
     for image, question in test_loader:
-        image, question = image.to(device), question.to(device)
+        question = {key: value.to(device) for key, value in question.items()} 
+        image = image.to(device)
         pred = model(image, question)
         pred = pred.argmax(1).cpu().item()
         submission.append(pred)
@@ -417,4 +447,5 @@ def main():
     np.save("submission.npy", submission)
 
 if __name__ == "__main__":
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     main()
