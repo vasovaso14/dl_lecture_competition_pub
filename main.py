@@ -11,6 +11,9 @@ import torch.nn as nn
 import torchvision
 from torchvision import transforms
 
+import torch.autograd.profiler as profiler
+
+import shutil
 
 def set_seed(seed):
     random.seed(seed)
@@ -318,7 +321,11 @@ def train(model, dataloader, optimizer, criterion, device):
     simple_acc = 0
 
     start = time.time()
+    count = 0
+    #with profiler.profile(record_shapes=True) as prof:
     for image, question, answers, mode_answer in dataloader:
+        print(count)
+        count += 1
         image, question, answer, mode_answer = \
             image.to(device), question.to(device), answers.to(device), mode_answer.to(device)
 
@@ -332,6 +339,8 @@ def train(model, dataloader, optimizer, criterion, device):
         total_loss += loss.item()
         total_acc += VQA_criterion(pred.argmax(1), answers)  # VQA accuracy
         simple_acc += (pred.argmax(1) == mode_answer).float().mean().item()  # simple accuracy
+
+    #print(prof.key_averages().table(sort_by="cpu_time_total"))
 
     return total_loss / len(dataloader), total_acc / len(dataloader), simple_acc / len(dataloader), time.time() - start
 
@@ -361,7 +370,7 @@ def eval(model, dataloader, optimizer, criterion, device):
 def main():
     # deviceの設定
     set_seed(42)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
     # dataloader / model
     transform = transforms.Compose([
@@ -372,13 +381,15 @@ def main():
     test_dataset = VQADataset(df_path="./data/valid.json", image_dir="./data/valid", transform=transform, answer=False)
     test_dataset.update_dict(train_dataset)
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
+    print("device: {}".format(device))
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=2, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True)
 
     model = VQAModel(vocab_size=len(train_dataset.question2idx)+1, n_answer=len(train_dataset.answer2idx)).to(device)
 
     # optimizer / criterion
-    num_epoch = 20
+    num_epoch = 1
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
