@@ -19,7 +19,7 @@ cd LLaVA
 pip3 install --upgrade pip  # enable PEP 660 support
 pip3 install -e .
 pip3 install -e ".[train]"
-RUN pip3 install flash-attn --no-build-isolation --no-cache-dir
+pip3 install flash-attn --no-build-isolation --no-cache-dir
 ```
 
 ## Prepare and preprocess dataset

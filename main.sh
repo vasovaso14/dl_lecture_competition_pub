@@ -2,7 +2,7 @@
 
 BASE_MODEL_VERSION="llava-v1.6-vicuna-13b"
 
-# # fine-tune llava by LoRA on a custom dataset
+# fine-tune llava by LoRA on a custom dataset
 deepspeed ./LLaVA/llava/train/train_mem.py \
     --deepspeed ./LLaVA/scripts/zero3.json \
     --lora_enable True \
@@ -22,7 +22,7 @@ deepspeed ./LLaVA/llava/train/train_mem.py \
     --group_by_modality_length True \
     --bf16 True \
     --output_dir ./checkpoints/$BASE_MODEL_VERSION-finetune_lora \
-    --num_train_epochs 5 \
+    --num_train_epochs 1 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --gradient_accumulation_steps 1 \
@@ -45,10 +45,10 @@ deepspeed ./LLaVA/llava/train/train_mem.py \
     # --save_steps 50000 \
 
 # merge LoRA weights to the base model
-# python3 ./LLaVA/scripts/merge_lora_weights.py \
-#     --model-path "./checkpoints/$BASE_MODEL_VERSION-finetune_lora" \
-#     --model-base "liuhaotian/$BASE_MODEL_VERSION" \
-#     --save-model-path "./checkpoints/$BASE_MODEL_VERSION-merged"
+python3 ./LLaVA/scripts/merge_lora_weights.py \
+    --model-path "./checkpoints/$BASE_MODEL_VERSION-finetune_lora" \
+    --model-base "liuhaotian/$BASE_MODEL_VERSION" \
+    --save-model-path "./checkpoints/$BASE_MODEL_VERSION-merged"
 
 # validate the fine-tuned model on a custom dataset
 python3 -m llava.eval.model_vqa_loader \
@@ -60,11 +60,11 @@ python3 -m llava.eval.model_vqa_loader \
     --conv-mode vicuna_v1
 
 # convert the prediction result to submission.npy 
-# python3 ./LLaVA/scripts/convert_vizwiz_for_submission.py \
-#     --annotation-file ./data/valid_for_llava.jsonl \
-#     --result-file ./eval/$BASE_MODEL_VERSION-lora.jsonl \
-#     --result-upload-file ./eval/$BASE_MODEL_VERSION-lora.json
+python3 ./LLaVA/scripts/convert_vizwiz_for_submission.py \
+    --annotation-file ./data/valid_for_llava.jsonl \
+    --result-file ./eval/$BASE_MODEL_VERSION-lora.jsonl \
+    --result-upload-file ./eval/$BASE_MODEL_VERSION-lora.json
 
-# python3 format_result_for_submission.py \
-    # --result-upload-file ./eval/$BASE_MODEL_VERSION-lora.json
-    # --submission-file ./submission.npy
+python3 format_result_for_submission.py \
+    --result-upload-file ./eval/$BASE_MODEL_VERSION-lora.json \
+    --submission-file ./submission.npy

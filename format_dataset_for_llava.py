@@ -90,7 +90,7 @@ def format_valid_jsonl(data_path, output_path):
     with open(output_path, 'w') as jsonl_file:
         for idx in range(len(json_load["image"])):
             image_id = json_load["image"][str(idx)].replace(".jpg", "")
-            question = json_load["question"][str(idx)]
+            question = process_text(json_load["question"][str(idx)])
 
             # LLaVA JSONの構造
             json_data = {
