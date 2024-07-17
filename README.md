@@ -43,7 +43,7 @@ source main.sh
 - https://www.youtube.com/watch?v=cambXXq9mrs
 - https://www.youtube.com/watch?v=XICHJx2_Rm8
 
-### *以下はfork元のREADME
+*以下はfork元のREADME
 
 # DL基礎講座2024　最終課題「Visual Question Answering（VQA）」
 
