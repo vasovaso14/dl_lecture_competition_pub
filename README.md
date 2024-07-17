@@ -23,10 +23,10 @@ RUN pip3 install flash-attn --no-build-isolation --no-cache-dir
 ```
 
 ## Prepare and preprocess dataset
-1. Download `train.json`, `train`, `valid.json`, `valid` and place them on /workspace/data
+1. Download `train.json`, `train`, `valid.json`, `valid` and place them on `/workspace/data`
 2. Format `train.json` and `valid.json` for LLaVA
 ```python
-cd
+cd /workspace
 python3 format_dataset_for_llava.py
 ```
 
@@ -43,7 +43,7 @@ source main.sh
 - https://www.youtube.com/watch?v=cambXXq9mrs
 - https://www.youtube.com/watch?v=XICHJx2_Rm8
 
-## 以下はfork元のREADME
+### *以下はfork元のREADME
 
 # DL基礎講座2024　最終課題「Visual Question Answering（VQA）」
 

@@ -27,34 +27,7 @@ RUN apt install -y --no-install-recommends \
         libsqlite3-dev \
         libglib2.0-0
 
-# # Update alternatives to use Python 3.10
-# RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
-
 WORKDIR /workspace
 
 COPY ./requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
-
-# 作業ディレクトリをLLaVAに変更
-WORKDIR /workspace/LLaVA
-
-# パッケージをインストール
-RUN pip3 install --upgrade pip
-# RUN if [ -f pyproject.toml ]; then pip3 install -e .; else echo "No setup.py or pyproject.toml found"; fi
-# RUN pip3 install -e .
-# # RUN if [ -f pyproject.toml ]; then pip3 install -e ".[train]"; else echo "No setup.py or pyproject.toml found"; fi
-# RUN pip3 install -e ".[train]"
-# # # RUN pip3 install flash-attn --no-build-isolation
-# # # RUN pip3 uninstall  flash-attn
-# # # RUN if [ -f pyproject.toml ]; then pip3 install -e ".[train]"; else echo "No setup.py or pyproject.toml found"; fi
-# RUN pip3 install flash-attn --no-build-isolation --no-cache-dir
-
-# # # LLaVAリポジトリの最新コードをプルしてアップグレード
-# RUN git pull \
-#     pip3 install -e .
-
-# キャッシュを無効にして再インストール（必要に応じてコメントを外してください）
-# RUN pip3 install flash-attn --no-build-isolation --no-cache-dir
-
-# コンテナの起動時にbashを実行
-CMD ["bash"]
