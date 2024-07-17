@@ -1,3 +1,50 @@
+# Fine-tune LLaVA for VQA
+Fine-tune LLaVA by LoRA on VizWiz.
+
+## Build an environment
+1. Clone LLaVA repositry
+```
+git clone https://github.com/haotian-liu/LLaVA.git
+```
+
+2. Build a Docker envrionment
+```bash
+docker build -t image_name .
+docker run -it -v $PWD:/workspace -w /workspace image_name bash
+```
+
+3. Install packages for LLaVA
+```bash
+cd LLaVA
+pip3 install --upgrade pip  # enable PEP 660 support
+pip3 install -e .
+pip3 install -e ".[train]"
+RUN pip3 install flash-attn --no-build-isolation --no-cache-dir
+```
+
+## Prepare and preprocess dataset
+1. Download `train.json`, `train`, `valid.json`, `valid` and place them on /workspace/data
+2. Format `train.json` and `valid.json` for LLaVA
+```python
+cd
+python3 format_dataset_for_llava.py
+```
+
+## Fine-tune LLaVA and evaluate the fine-tuned model
+```bash
+source main.sh
+```
+
+## References
+- https://github.com/haotian-liu/LLaVA
+- https://huggingface.co/liuhaotian
+- https://wandb.ai/byyoung3/ml-news/reports/How-to-Fine-Tune-LLaVA-on-a-Custom-Dataset--Vmlldzo2NjUwNTc1#more-reports-on-fine-tuning
+- https://www.cnblogs.com/xiangcaoacao/p/18188100
+- https://www.youtube.com/watch?v=cambXXq9mrs
+- https://www.youtube.com/watch?v=XICHJx2_Rm8
+
+## 以下はfork元のREADME
+
 # DL基礎講座2024　最終課題「Visual Question Answering（VQA）」
 
 

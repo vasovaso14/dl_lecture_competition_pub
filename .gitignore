@@ -1,3 +1,9 @@
-data
+data/train
+data/valid
 core
 model.pth
+eval
+LLaVA
+wandb
+nohup.out
+checkpoints
